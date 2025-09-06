@@ -1,14 +1,51 @@
 import React, { useState } from 'react';
 
 const App = () => {
-  const [movie, setMovie] = useState({ id: 'm001', title: 'The Martian', duration: 144, genre: 'Sci-Fi' });
-  const [theater, setTheater] = useState({ id: 't001', name: 'Galaxy Cinemas', totalSeats: 250 });
-  const [show, setShow] = useState({
-    id: 's001',
-    time: new Date(2025, 10, 15, 19, 0),
-    availableSeats: { regular: 100, premium: 50 },
-  });
+  // NEW: We now have an array of shows instead of just one.
+  const [shows, setShows] = useState([
+    {
+      id: 's001',
+      title: 'The Martian',
+      theater: 'Galaxy Cinemas',
+      time: new Date(2025, 10, 15, 19, 0),
+      availableSeats: { regular: 100, premium: 50 },
+      genre: 'Sci-Fi',
+      duration: 144
+    },
+    {
+      id: 's002',
+      title: 'Inception',
+      theater: 'Main Street Theater',
+      time: new Date(2025, 10, 15, 21, 30),
+      availableSeats: { regular: 80, premium: 40 },
+      genre: 'Sci-Fi',
+      duration: 148
+    },
+    {
+      id: 's003',
+      title: 'Hello Brother',
+      theater: 'Cineplex',
+      time: new Date(2025, 10, 16, 17, 0),
+      availableSeats: { regular: 120, premium: 60 },
+      genre: 'Comedy',
+      duration: 120
+    },
+    {
+      id:'s004',
+      title:'Avatar',
+      theater: 'Inox',
+      time: new Date(2025, 10, 16, 17, 0),
+      availableSeats: { regular: 150, premium: 50 },
+      genre: 'Sci_fi',
+      duration: 144
+    }
+  ]);
 
+  // NEW: State to keep track of the currently selected show.
+  // We'll select the first show by default.
+  const [selectedShow, setSelectedShow] = useState(shows[0]);
+
+  // State for our booking history and form inputs.
   const [bookingHistory, setBookingHistory] = useState([]);
   const [seatsToBook, setSeatsToBook] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState('regular');
@@ -18,53 +55,82 @@ const App = () => {
     return date.toLocaleString('en-US', { weekday: 'short', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true });
   };
   
+  // A function to handle changes in the number input
   const handleSeatsChange = (event) => {
     setSeatsToBook(parseInt(event.target.value));
   };
 
+  // A function to handle changes in the dropdown
   const handleCategoryChange = (event) => {
     setSelectedCategory(event.target.value);
   };
 
   const handleBookTickets = () => {
-    if (show.availableSeats[selectedCategory] >= seatsToBook) {
+    if (selectedShow.availableSeats[selectedCategory] >= seatsToBook) {
+      // Find the index of the selected show in our array
+      const showIndex = shows.findIndex(s => s.id === selectedShow.id);
+      
+      // Create a NEW object for the updated show
       const updatedShow = {
-        ...show,
+        ...selectedShow,
         availableSeats: {
-          ...show.availableSeats,
-          [selectedCategory]: show.availableSeats[selectedCategory] - seatsToBook,
+          ...selectedShow.availableSeats,
+          [selectedCategory]: selectedShow.availableSeats[selectedCategory] - seatsToBook,
         },
       };
-      setShow(updatedShow);
+      
+      // Update the main shows array with the updated show
+      const updatedShows = [...shows];
+      updatedShows[showIndex] = updatedShow;
+      setShows(updatedShows);
+      
+      // Update the selectedShow state to reflect the change
+      setSelectedShow(updatedShow);
 
       const newBooking = {
         id: Date.now(),
         seats: seatsToBook,
         category: selectedCategory,
-        showId: show.id,
+        showId: selectedShow.id,
+        title: selectedShow.title,
+        time: selectedShow.time,
       };
 
       setBookingHistory([...bookingHistory, newBooking]);
-      setMessage(`✅ Success! Booked ${seatsToBook} ${selectedCategory} ticket(s).`);
+      setMessage(`✅ Success! Booked ${seatsToBook} ${selectedCategory} ticket(s) for ${selectedShow.title}.`);
 
     } else {
       setMessage(`❌ Booking failed. Not enough ${selectedCategory} seats available.`);
     }
   };
 
-  // NEW: Function to handle booking cancellation
   const handleCancelBooking = (bookingToCancel) => {
-    // 1. Return seats to the show's available seats
+    // Find the show associated with the canceled booking
+    const showToUpdate = shows.find(s => s.id === bookingToCancel.showId);
+    
+    // Create a new updated show object with the seats returned
     const updatedShow = {
-      ...show,
+      ...showToUpdate,
       availableSeats: {
-        ...show.availableSeats,
-        [bookingToCancel.category]: show.availableSeats[bookingToCancel.category] + bookingToCancel.seats,
+        ...showToUpdate.availableSeats,
+        [bookingToCancel.category]: showToUpdate.availableSeats[bookingToCancel.category] + bookingToCancel.seats,
       },
     };
-    setShow(updatedShow);
     
-    // 2. Filter out the booking from the history (create a NEW array)
+    // Find the index of the show in our array
+    const showIndex = shows.findIndex(s => s.id === bookingToCancel.showId);
+    
+    // Create a NEW array of shows and update the specific show
+    const updatedShows = [...shows];
+    updatedShows[showIndex] = updatedShow;
+    setShows(updatedShows);
+
+    // Update the selectedShow state if it was the one being displayed
+    if (selectedShow.id === bookingToCancel.showId) {
+      setSelectedShow(updatedShow);
+    }
+    
+    // Filter out the booking from the history (create a NEW array)
     const updatedHistory = bookingHistory.filter(booking => booking.id !== bookingToCancel.id);
     setBookingHistory(updatedHistory);
     
@@ -74,21 +140,41 @@ const App = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
       
-      {/* Movie Info Card */}
+      {/* Container for the main movie info card */}
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl text-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">{movie.title}</h1>
-        <p className="text-xl text-gray-600 mb-4">{theater.name}</p>
+        {/* NEW: Show Selection Dropdown */}
+        <div className="mb-4">
+          <label htmlFor="show-select" className="text-gray-700 font-semibold">
+            Select a Movie:
+          </label>
+          <select 
+            id="show-select"
+            className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm"
+            onChange={(e) => setSelectedShow(shows.find(s => s.id === e.target.value))}
+            value={selectedShow.id}
+          >
+            {shows.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.title} ({s.theater})
+              </option>
+            ))}
+          </select>
+        </div>
         
-        <p className="text-gray-500">{formatDate(show.time)}</p>
-        <p className="text-gray-500">Duration: {movie.duration} mins</p>
-        <p className="text-gray-500 mb-6">Genre: {movie.genre}</p>
+        {/* We now use selectedShow to display the info */}
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">{selectedShow.title}</h1>
+        <p className="text-xl text-gray-600 mb-4">{selectedShow.theater}</p>
+        
+        <p className="text-gray-500">{formatDate(selectedShow.time)}</p>
+        <p className="text-gray-500">Duration: {selectedShow.duration} mins</p>
+        <p className="text-gray-500 mb-6">Genre: {selectedShow.genre}</p>
         
         <div className="flex justify-around items-center bg-gray-50 p-4 rounded-lg mt-4">
           <p className="text-md text-gray-700 font-semibold">
-            Regular Seats: <span className="text-lg text-green-600 font-bold">{show.availableSeats.regular}</span>
+            Regular Seats: <span className="text-lg text-green-600 font-bold">{selectedShow.availableSeats.regular}</span>
           </p>
           <p className="text-md text-gray-700 font-semibold">
-            Premium Seats: <span className="text-lg text-green-600 font-bold">{show.availableSeats.premium}</span>
+            Premium Seats: <span className="text-lg text-green-600 font-bold">{selectedShow.availableSeats.premium}</span>
           </p>
         </div>
       </div>
@@ -147,30 +233,34 @@ const App = () => {
       {/* Booking History Section */}
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl">
         <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your Bookings</h2>
-        {/* Check if there are any bookings to display */}
         {bookingHistory.length === 0 ? (
           <p className="text-center text-gray-500">You have no bookings yet.</p>
         ) : (
           <ul className="space-y-4">
-            {/* Loop through the bookingHistory array and create a list item for each booking */}
             {bookingHistory.map((booking) => (
               <li key={booking.id} className="bg-gray-50 p-4 rounded-lg flex justify-between items-center shadow-sm">
                 <div>
                   <p className="font-semibold text-gray-800">
-                    {booking.seats} {booking.category} seat{booking.seats > 1 ? 's' : ''}
+                    {booking.seats} {booking.category} seat{booking.seats > 1 ? 's' : ''} for {booking.title}
                   </p>
-                  <p className="text-sm text-gray-500">Booking ID: {booking.id}</p>
+                  <p className="text-sm text-gray-500">
+                    <span className="font-medium">Time:</span> {formatDate(booking.time)}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    <span className="font-medium">Booking ID:</span> {booking.id}
+                  </p>
                 </div>
-                <p className={`font-bold ${booking.category === 'premium' ? 'text-indigo-600' : 'text-gray-600'}`}>
-                  ${booking.category === 'regular' ? booking.seats * 15 : booking.seats * 25}
-                </p>
-                 {/* NEW: Cancel Button */}
-                 <button 
-                   onClick={() => handleCancelBooking(booking)}
-                   className="py-1 px-3 ml-4 text-sm font-semibold text-red-600 bg-red-100 rounded-full hover:bg-red-200 transition-colors"
-                 >
-                   Cancel
-                 </button>
+                <div className="flex items-center space-x-2">
+                  <p className={`font-bold ${booking.category === 'premium' ? 'text-indigo-600' : 'text-gray-600'}`}>
+                    ${booking.category === 'regular' ? booking.seats * 15 : booking.seats * 25}
+                  </p>
+                  <button 
+                    onClick={() => handleCancelBooking(booking)}
+                    className="py-1 px-3 ml-4 text-sm font-semibold text-red-600 bg-red-100 rounded-full hover:bg-red-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
